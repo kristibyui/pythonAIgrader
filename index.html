@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Python Grader</title>
+    <!-- Use the Tailwind CSS CDN for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Optional custom styles for better readability and a clean look */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen p-8 text-gray-200 flex items-center justify-center">
+
+    <div class="w-full max-w-4xl p-8 bg-gray-800 rounded-2xl shadow-2xl space-y-8">
+
+        <header class="text-center space-y-2">
+            <h1 class="text-5xl font-extrabold text-white">
+                AI Python Grader
+            </h1>
+            <p class="text-lg text-gray-400">
+                A helpful assistant to grade beginner Python assignments using AI.
+            </p>
+        </header>
+
+        <form id="gradingForm" class="space-y-6">
+            <div class="space-y-2">
+                <label for="requirements" class="block text-sm font-medium text-gray-300">
+                    Assignment Requirements
+                </label>
+                <textarea
+                    id="requirements"
+                    rows="5"
+                    class="w-full p-4 rounded-xl bg-gray-700 text-gray-100 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    placeholder="e.g., 'Write a Python function named 'calculate_area' that takes two arguments, 'length' and 'width', and returns the area of a rectangle.'"
+                    required
+                ></textarea>
+            </div>
+
+            <div class="space-y-2">
+                <label for="code" class="block text-sm font-medium text-gray-300">
+                    Student Python Code
+                </label>
+                <textarea
+                    id="code"
+                    rows="10"
+                    class="w-full p-4 rounded-xl bg-gray-700 text-gray-100 font-mono border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                    placeholder="Paste the student's Python code here..."
+                    required
+                ></textarea>
+            </div>
+
+            <button
+                type="submit"
+                id="submitBtn"
+                class="w-full py-4 px-6 rounded-xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-700 transition-colors duration-300 disabled:bg-blue-800 disabled:cursor-not-allowed"
+            >
+                Grade Assignment
+            </button>
+        </form>
+
+        <!-- Display area for error and result messages -->
+        <div id="statusMessage" class="hidden p-4 rounded-xl text-center"></div>
+        <div id="resultContainer" class="hidden bg-gray-700 p-6 rounded-2xl border border-gray-600">
+            <h2 class="text-2xl font-bold text-white mb-2">Grade and Feedback</h2>
+            <div id="resultContent" class="prose prose-invert max-w-none text-gray-300 leading-relaxed"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('gradingForm');
+            const requirementsTextarea = document.getElementById('requirements');
+            const codeTextarea = document.getElementById('code');
+            const submitBtn = document.getElementById('submitBtn');
+            const statusMessageDiv = document.getElementById('statusMessage');
+            const resultContainerDiv = document.getElementById('resultContainer');
+            const resultContentDiv = document.getElementById('resultContent');
+
+            // Function to display status/error messages
+            const setStatus = (message, isError = false) => {
+                statusMessageDiv.textContent = message;
+                statusMessageDiv.classList.remove('hidden', 'bg-red-900', 'text-red-300', 'border-red-700', 'bg-green-900', 'text-green-300', 'border-green-700');
+                if (isError) {
+                    statusMessageDiv.classList.add('bg-red-900', 'text-red-300', 'border-red-700');
+                } else {
+                    statusMessageDiv.classList.add('bg-green-900', 'text-green-300', 'border-green-700');
+                }
+            };
+
+            // Event listener for form submission
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                // Clear previous messages and results
+                resultContainerDiv.classList.add('hidden');
+                statusMessageDiv.classList.add('hidden');
+
+                const studentCode = codeTextarea.value;
+                const requirements = requirementsTextarea.value;
+
+                if (!studentCode || !requirements) {
+                    setStatus('Please provide both student code and assignment requirements.', true);
+                    return;
+                }
+
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = `
+                    <div class="flex items-center justify-center space-x-2">
+                        <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span>Grading...</span>
+                    </div>
+                `;
+
+                try {
+                    const apiKey = "";
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                    const systemPrompt = `
+                        You are a Python teaching assistant. Your task is to grade a student's Python code based on the provided assignment requirements and a specific grading scale.
+
+                        Grading Scale:
+                        50% - Some attempt made but missing most requirements
+                        75% - Multiple requirements missing but not most
+                        85% - Only a minor requirement missing
+                        93% - All requirements are met
+                        100% - All requirements met + creativity/exceeds minimum
+
+                        Provide a final percentage grade and a concise, well-structured explanation for that grade. Your response should be in markdown format. Start with the grade in bold, followed by a detailed explanation. The explanation should be professional, encouraging, and helpful. Do not include any code snippets in your response.
+                    `;
+
+                    const userQuery = `
+                        Grade the following student's Python code.
+
+                        [ASSIGNMENT REQUIREMENTS]
+                        ${requirements}
+
+                        [STUDENT CODE]
+                        ${studentCode}
+                    `;
+
+                    const payload = {
+                        contents: [{ parts: [{ text: userQuery }] }],
+                        systemInstruction: {
+                            parts: [{ text: systemPrompt }]
+                        },
+                    };
+
+                    let response;
+                    let retries = 0;
+                    const maxRetries = 3;
+                    const baseDelay = 1000;
+
+                    while (retries < maxRetries) {
+                        try {
+                            response = await fetch(apiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+
+                            if (response.ok) {
+                                break;
+                            } else if (response.status === 429) {
+                                retries++;
+                                const delay = baseDelay * Math.pow(2, retries);
+                                await new Promise(res => setTimeout(res, delay));
+                            } else {
+                                throw new Error(`API call failed with status: ${response.status}`);
+                            }
+                        } catch (err) {
+                            if (retries === maxRetries - 1) {
+                                throw err;
+                            }
+                            retries++;
+                            const delay = baseDelay * Math.pow(2, retries);
+                            await new Promise(res => setTimeout(res, delay));
+                        }
+                    }
+
+                    const data = await response.json();
+                    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (text) {
+                        resultContentDiv.innerHTML = text; // Use innerHTML to render Markdown
+                        resultContainerDiv.classList.remove('hidden');
+                    } else {
+                        setStatus('Failed to get a response from the AI. Please try again.', true);
+                    }
+                } catch (err) {
+                    console.error('An error occurred:', err);
+                    setStatus('An error occurred while grading. Please check your network and try again.', true);
+                } finally {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Grade Assignment';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
